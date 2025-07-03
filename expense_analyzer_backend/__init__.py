@@ -33,12 +33,39 @@ def register_blueprints(app):
     """Register application blueprints"""
     from expense_analyzer_backend.routes.expenses import expenses_bp
     from expense_analyzer_backend.routes.analysis import analysis_bp
+    from expense_analyzer_backend.routes.reports import reports_bp  # <-- add this
     
     api_prefix = app.config['API_PREFIX']
     app.register_blueprint(expenses_bp, url_prefix=f'{api_prefix}/expenses')
     app.register_blueprint(analysis_bp, url_prefix=f'{api_prefix}/analysis')
+    app.register_blueprint(reports_bp, url_prefix=f'{api_prefix}/reports')  # <-- add this
 
-
+def setup_scheduler(app):
+    """Setup background scheduler for automated reports"""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from expense_analyzer_backend.routes.reports import generate_all_monthly_reports
+        
+        scheduler = BackgroundScheduler()
+        
+        # Schedule monthly report generation on the 1st of every month at 2:00 AM
+        scheduler.add_job(
+            func=generate_all_monthly_reports,
+            trigger=CronTrigger(day=1, hour=2, minute=0),
+            id='monthly_reports',
+            name='Generate monthly reports',
+            replace_existing=True
+        )
+        
+        scheduler.start()
+        app.logger.info("Scheduler initialized successfully")
+        
+        # Store scheduler in app for cleanup
+        app.scheduler = scheduler
+        
+    except Exception as e:
+        app.logger.error(f"Failed to initialize scheduler: {e}")
 def register_error_handlers(app):
     """Register error handlers"""
     @app.errorhandler(400)
